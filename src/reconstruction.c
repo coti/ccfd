@@ -6,7 +6,12 @@
  * \date Sat 28 Mar 2020 10:17:02 AM CET
  */
 
+#ifndef ACC_GPU
 #include <math.h>
+#else
+double fmin( double, double );
+double fmax( double, double );
+#endif // ACC_GPU
 
 #include "main.h"
 #include "reconstruction.h"
@@ -200,6 +205,7 @@ void spatialReconstruction(double time)
 	if (spatialOrder == 1) {
 		/* set side states to be equal to mean value */
 		#pragma omp parallel for
+        #pragma acc parallel loop
 		for (long iElem = 0; iElem < nElems; ++iElem) {
 			elem_t *aElem = elem[iElem];
 			side_t *aSide = aElem->firstSide;
@@ -229,6 +235,7 @@ void spatialReconstruction(double time)
 	} else {
 		/* reconstruction of values at side GPs */
 		#pragma omp parallel for
+     	#pragma acc parallel loop
 		for (long iElem = 0; iElem < nElems; ++iElem) {
 			elem_t *aElem = elem[iElem];
 			aElem->u_x[RHO] = 0.0;
@@ -250,6 +257,7 @@ void spatialReconstruction(double time)
 		setBCatBarys(time);
 
 		#pragma omp parallel for
+        #pragma acc parallel loop
 		for (long iElem = 0; iElem < nElems; ++iElem) {
 			elem_t *aElem = elem[iElem];
 			side_t *aSide = aElem->firstSide;
@@ -276,6 +284,7 @@ void spatialReconstruction(double time)
 
 		/* limit gradients and reconstruct values at side GPs */
 		#pragma omp parallel for
+     	#pragma acc parallel loop
 		for (long iElem = 0; iElem < nElems; ++iElem) {
 			elem_t *aElem = elem[iElem];
 

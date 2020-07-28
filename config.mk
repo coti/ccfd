@@ -4,10 +4,13 @@
 COMPILER = gnu
 
 # select equation system [euler, navierstokes]
-EQNSYS = euler
+EQNSYS = navierstokes
 
-# multithreading flag [on, off]
-PARALLEL = on
+# multithreading flag [openmp, openacc, off]
+PARALLEL = openacc
+
+# enable GPU (requires a multithreading flag) [on, off]
+GPU = on
 
 # debugging flag [on, off]
 DEBUG = off

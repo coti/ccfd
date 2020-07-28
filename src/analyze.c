@@ -10,7 +10,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#ifndef ACC_GPU
 #include <math.h>
+#else
+double cos( double );
+double sin( double );
+double sqrt( double );
+double atan2( double, double );
+double fabs( double );
+double fmax( double, double );
+#endif // ACC_GPU
 
 #include "analyze.h"
 #include "readInTools.h"
@@ -444,11 +453,32 @@ void analyze(double time, long iter, double resIter[NVAR + 2])
  */
 void calcErrors(double time)
 {
-	double L1[NVAR] = {0.0}, L2[NVAR] = {0.0}, Linf[NVAR] = {0.0};
+    // TMP CAMILLE
+    	double L1[NVAR] = {0.0}, L2[NVAR] = {0.0}, Linf[NVAR] = {0.0};
+
+#ifdef OPENACC
+        //    double* pL1 = &L1[0];
+        //    double* pL2 = &L2[0];
+    double* pLinf = &Linf[0];
+
+    double L1_0 = 0.0;
+    double L1_1 = 0.0;
+    double L1_2 = 0.0;
+    double L1_3 = 0.0;
+
+    double L2_0 = 0.0;
+    double L2_1 = 0.0;
+    double L2_2 = 0.0;
+    double L2_3 = 0.0;
+#endif // OPENACC
+    
+    // END TMP CAMILLE
 
 	spatialReconstruction(time);
 
 	#pragma omp parallel for reduction(max:Linf), reduction(+:L1,L2)
+    //#pragma acc parallel loop reduction(max:pLinf), reduction(+:pL1,pL2)
+#pragma acc parallel loop reduction(max:pLinf), reduction(+:L1_0, L1_1, L1_2, L1_3, L2_0, L2_1, L2_2, L2_3 )
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 		for (int iGP = 0; iGP < aElem->nGP; ++iGP) {
@@ -481,21 +511,46 @@ void calcErrors(double time)
 			Linf[P]   = fmax(Linf[P],   err[P]);
 
 			/* update L1 error norm */
-			L1[RHO] += err[RHO] * aElem->wGP[iGP];
+#ifdef OPENACC
+            L1_0 += err[RHO] * aElem->wGP[iGP];
+			L1_1  += err[VX]  * aElem->wGP[iGP];
+			L1_2  += err[VY]  * aElem->wGP[iGP];
+			L1_3   += err[P]   * aElem->wGP[iGP];
+#else
+            L1[RHO] += err[RHO] * aElem->wGP[iGP];
 			L1[VX]  += err[VX]  * aElem->wGP[iGP];
 			L1[VY]  += err[VY]  * aElem->wGP[iGP];
 			L1[P]   += err[P]   * aElem->wGP[iGP];
+#endif // OPENACC
 
 			/* update L2 error norm */
-			L2[RHO] += err[RHO] * err[RHO] * aElem->wGP[iGP];
+#ifdef OPENACC
+            L2_0 += err[RHO] * err[RHO] * aElem->wGP[iGP];
+			L2_1  += err[VX]  * err[VX]  * aElem->wGP[iGP];
+			L2_2  += err[VY]  * err[VY]  * aElem->wGP[iGP];
+			L2_3   += err[P]   * err[P]   * aElem->wGP[iGP];
+#else
+            L2[RHO] += err[RHO] * err[RHO] * aElem->wGP[iGP];
 			L2[VX]  += err[VX]  * err[VX]  * aElem->wGP[iGP];
 			L2[VY]  += err[VY]  * err[VY]  * aElem->wGP[iGP];
 			L2[P]   += err[P]   * err[P]   * aElem->wGP[iGP];
+#endif // OPENACC
 		}
 	}
 
 	/* finalize L1 and L2 */
-	L1[RHO] *= totalArea_q;
+#ifdef OPENACC
+    L1[RHO] = L1_0 * totalArea_q;
+	L1[VX]  = L1_1 * totalArea_q;
+	L1[VY]  = L1_2 * totalArea_q;
+	L1[P]   = L1_3 * totalArea_q;
+
+	L2[RHO] = sqrt(L2_0 * totalArea_q);
+	L2[VX]  = sqrt(L2_1  * totalArea_q);
+	L2[VY]  = sqrt(L2_2  * totalArea_q);
+	L2[P]   = sqrt(L2_3   * totalArea_q);
+#else
+    L1[RHO] *= totalArea_q;
 	L1[VX]  *= totalArea_q;
 	L1[VY]  *= totalArea_q;
 	L1[P]   *= totalArea_q;
@@ -504,7 +559,8 @@ void calcErrors(double time)
 	L2[VX]  = sqrt(L2[VX]  * totalArea_q);
 	L2[VY]  = sqrt(L2[VY]  * totalArea_q);
 	L2[P]   = sqrt(L2[P]   * totalArea_q);
-
+ #endif // OPENACC
+    
 	/* input and output */
 	printf("\nError Analysis at t = %g\n", time);
 	printf("|                RHO           VX           VY            P\n");
@@ -522,20 +578,48 @@ void globalResidual(double resIter[NVAR + 2])
 {
 	memset(resIter, 0, (NVAR + 2) * sizeof(double));
 
+    // TMP CAMILLE
+
+#ifdef OPENACC
+    double resIter_0 = 0.0;
+    double resIter_1 = 0.0;
+    double resIter_2 = 0.0;
+    double resIter_3 = 0.0;
+#endif // OPENACC
+    
+    // END TMP_CAMILLE
+    
 	#pragma omp parallel for reduction(+:resIter[:NVAR + 2])
+    //	#pragma acc parallel loop reduction(+:resIter[:NVAR + 2])
+#pragma acc parallel loop reduction(+:resIter_0, resIter_1, resIter_2, resIter_3 )
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
-		resIter[RHO] += aElem->area * aElem->u_t[RHO] * aElem->u_t[RHO];
+#ifdef OPENACC
+        resIter_0 += aElem->area * aElem->u_t[RHO] * aElem->u_t[RHO];
+		resIter_1  += aElem->area * aElem->u_t[MX]  * aElem->u_t[MX];
+		resIter_2  += aElem->area * aElem->u_t[MY]  * aElem->u_t[MY];
+		resIter_3   += aElem->area * aElem->u_t[E]   * aElem->u_t[E];
+#else
+        resIter[RHO] += aElem->area * aElem->u_t[RHO] * aElem->u_t[RHO];
 		resIter[MX]  += aElem->area * aElem->u_t[MX]  * aElem->u_t[MX];
 		resIter[MY]  += aElem->area * aElem->u_t[MY]  * aElem->u_t[MY];
 		resIter[E]   += aElem->area * aElem->u_t[E]   * aElem->u_t[E];
+#endif   // OPENACC
 	}
 
 	/* compute 2-Norm of the residual */
-	resIter[RHO] = sqrt(resIter[RHO] * totalArea_q);
+#ifdef OPENACC
+    resIter[RHO] = sqrt(resIter_0 * totalArea_q);
+	resIter[MX]  = sqrt(resIter_1  * totalArea_q);
+	resIter[MY]  = sqrt(resIter_2  * totalArea_q);
+	resIter[E]   = sqrt(resIter_3   * totalArea_q);
+#else
+    resIter[RHO] = sqrt(resIter[RHO] * totalArea_q);
 	resIter[MX]  = sqrt(resIter[MX]  * totalArea_q);
 	resIter[MY]  = sqrt(resIter[MY]  * totalArea_q);
 	resIter[E]   = sqrt(resIter[E]   * totalArea_q);
+#endif // OPENACC
+    
 }
 
 /**

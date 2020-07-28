@@ -6,7 +6,12 @@
  * \date Wed 01 Apr 2020 12:25:11 PM CEST
  */
 
+#ifndef ACC_GPU
 #include <math.h>
+#else
+double cos( double );
+double sin( double );
+#endif // ACC_GPU
 
 #include "main.h"
 #include "equation.h"
@@ -66,6 +71,7 @@ void evalSource(int iSource, double x[NDIM], double time, double source[NVAR])
 void calcSource(double time)
 {
 	#pragma omp parallel for
+	#pragma acc parallel loop gang
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 		aElem->source[RHO] = 0.0;

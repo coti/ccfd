@@ -186,6 +186,7 @@ bool calcDinv(double **A, double **Ainv)
 void buildMatrix(double time, double dt)
 {
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < NVAR * nElems; ++iElem) {
 		for (long jElem = 0; jElem < NVAR * nElems; ++jElem) {
 			dRdU[iElem][jElem] = 0.0;
@@ -224,6 +225,7 @@ void buildMatrix(double time, double dt)
 	}
 
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < NVAR * nElems; ++iElem) {
 		for (long jElem = 0; jElem < NVAR * nElems; ++jElem) {
 			dRdU[iElem][jElem] *= - dt;
@@ -233,6 +235,7 @@ void buildMatrix(double time, double dt)
 	}
 
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		long r = iElem * NVAR;
 
@@ -261,6 +264,7 @@ void buildMatrix(double time, double dt)
 void LUSGS(double **B, double **delX)
 {
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		for (int iVar = 0; iVar < NVAR; ++iVar) {
 			delX[iVar][iElem] = 0.0;
@@ -347,7 +351,8 @@ void matrixVector(double time, double dt, double alpha, double **v,
 	double epsFD = vectorDotProduct(v, v);
 	epsFD = rEps0 / sqrt(epsFD);
 
-	#pragma omp parallel for
+    /*	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 
@@ -357,11 +362,50 @@ void matrixVector(double time, double dt, double alpha, double **v,
 		aElem->cVar[E]   = XK[E][iElem]   + epsFD * v[E][iElem];
 
 		consPrim(aElem->cVar, aElem->pVar);
+        }*/
+
+    /*    
+	#pragma acc parallel loop
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		aElem->cVar[RHO] = XK[RHO][iElem] + epsFD * v[RHO][iElem];
 	}
+	#pragma acc parallel loop
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		aElem->cVar[MX]  = XK[MX][iElem]  + epsFD * v[MX][iElem];
+	}
+	#pragma acc parallel loop
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		aElem->cVar[MY]  = XK[MY][iElem]  + epsFD * v[MY][iElem];
+	}
+	#pragma acc parallel loop
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		aElem->cVar[E]   = XK[E][iElem]   + epsFD * v[E][iElem];
+		consPrim(aElem->cVar, aElem->pVar);
+	}
+    */
+
+#pragma acc parallel loop independent gang collapse( 2 )
+    for( int i = 0 ; i < 4 ; i++ ) {
+        for (long iElem = 0; iElem < nElems; ++iElem) {
+            elem_t *aElem = elem[iElem];
+            aElem->cVar[i] = XK[i][iElem] + epsFD * v[i][iElem];
+        }
+    }
+    
+#pragma acc parallel loop gang
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		consPrim(aElem->cVar, aElem->pVar);
+	}   
 
 	fvTimeDerivative(time);
 
-	#pragma omp parallel for
+    /*	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 
@@ -369,7 +413,37 @@ void matrixVector(double time, double dt, double alpha, double **v,
 		res[MX][iElem]  = v[MX][iElem]  - alpha * dt * (aElem->u_t[MX]  - R_XK[MX][iElem])  / epsFD;
 		res[MY][iElem]  = v[MY][iElem]  - alpha * dt * (aElem->u_t[MY]  - R_XK[MY][iElem])  / epsFD;
 		res[E][iElem]   = v[E][iElem]   - alpha * dt * (aElem->u_t[E]   - R_XK[E][iElem])   / epsFD;
-	}
+        }*/
+
+    /*	#pragma acc parallel loop
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		res[RHO][iElem] = v[RHO][iElem] - alpha * dt * (aElem->u_t[RHO] - R_XK[RHO][iElem]) / epsFD;
+    }
+	#pragma acc parallel loop
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		res[MX][iElem]  = v[MX][iElem]  - alpha * dt * (aElem->u_t[MX]  - R_XK[MX][iElem])  / epsFD;
+    }
+	#pragma acc parallel loop
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		res[MY][iElem]  = v[MY][iElem]  - alpha * dt * (aElem->u_t[MY]  - R_XK[MY][iElem])  / epsFD;
+    }
+	#pragma acc parallel loop
+	for (long iElem = 0; iElem < nElems; ++iElem) {
+		elem_t *aElem = elem[iElem];
+		res[E][iElem]   = v[E][iElem]   - alpha * dt * (aElem->u_t[E]   - R_XK[E][iElem])   / epsFD;
+    }
+    */
+
+#pragma acc parallel loop independent gang collapse( 2 )
+    for( int i = 0 ; i < 4 ; i++ ) {
+        for (long iElem = 0; iElem < nElems; ++iElem) {
+            elem_t *aElem = elem[iElem];
+            res[i][iElem] = v[i][iElem] - alpha * dt * (aElem->u_t[i] - R_XK[i][iElem]) / epsFD;
+        }
+    }    
 }
 
 /**
@@ -390,6 +464,7 @@ void GMRES_M(double time, double dt, double alpha, double **B,
 	double normR0 = normB;
 
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		R0[RHO][iElem] = - B[RHO][iElem];
 		R0[MX][iElem]  = - B[MX][iElem];
@@ -425,28 +500,67 @@ void GMRES_M(double time, double dt, double alpha, double **B,
 		if (usePrecond) {
 			LUSGS(V[m], Z[m]);
 		} else {
+            /*
 			#pragma omp parallel for
+	        #pragma acc parallel loop
 			for (long iElem = 0; iElem < nElems; ++iElem) {
 				Z[m][RHO][iElem] = V[m][RHO][iElem];
 				Z[m][MX][iElem]  = V[m][MX][iElem];
 				Z[m][MY][iElem]  = V[m][MY][iElem];
 				Z[m][E][iElem]   = V[m][E][iElem];
-			}
+                }*/
+	        #pragma acc parallel loop
+			for (long iElem = 0; iElem < nElems; ++iElem) {
+				Z[m][RHO][iElem] = V[m][RHO][iElem];
+            }
+	        #pragma acc parallel loop
+			for (long iElem = 0; iElem < nElems; ++iElem) {
+				Z[m][MX][iElem]  = V[m][MX][iElem];
+            }
+	        #pragma acc parallel loop
+			for (long iElem = 0; iElem < nElems; ++iElem) {
+				Z[m][MY][iElem]  = V[m][MY][iElem];
+            }
+	        #pragma acc parallel loop
+			for (long iElem = 0; iElem < nElems; ++iElem) {
+				Z[m][E][iElem]   = V[m][E][iElem];
+            }
+
+            
 		}
 
 		matrixVector(time, dt, alpha, Z[m], W);
 
 		/* Gram-Schmidt */
 		for (int nn = 0; nn <= m; ++nn) {
-			H[nn][m] = vectorDotProduct(V[nn], W);
+           		H[nn][m] = vectorDotProduct(V[nn], W);
 
-			#pragma omp parallel for
+		 /*	#pragma omp parallel for
+            #pragma acc parallel loop
 			for (int iElem = 0; iElem < nElems; ++iElem) {
 				W[RHO][iElem] -= H[nn][m] * V[nn][RHO][iElem];
 				W[MX][iElem]  -= H[nn][m] * V[nn][MX][iElem];
 				W[MY][iElem]  -= H[nn][m] * V[nn][MY][iElem];
 				W[E][iElem]   -= H[nn][m] * V[nn][E][iElem];
+                }*/
+            #pragma acc parallel loop
+			for (int iElem = 0; iElem < nElems; ++iElem) {
+				W[RHO][iElem] -= H[nn][m] * V[nn][RHO][iElem];
 			}
+            #pragma acc parallel loop
+			for (int iElem = 0; iElem < nElems; ++iElem) {
+				W[MX][iElem]  -= H[nn][m] * V[nn][MX][iElem];
+			}
+            #pragma acc parallel loop
+			for (int iElem = 0; iElem < nElems; ++iElem) {
+				W[MY][iElem]  -= H[nn][m] * V[nn][MY][iElem];
+			}
+            #pragma acc parallel loop
+			for (int iElem = 0; iElem < nElems; ++iElem) {
+				W[E][iElem]   -= H[nn][m] * V[nn][E][iElem];
+			}
+
+            
 		}
 
 		double res = vectorDotProduct(W, W);
@@ -480,26 +594,64 @@ void GMRES_M(double time, double dt, double alpha, double **B,
 			}
 
 			for (int nn = 0; nn <= m; ++nn) {
-				#pragma omp parallel for
+                /*	#pragma omp parallel for
+                #pragma acc parallel loop
 				for (long iElem = 0; iElem < nElems; ++iElem) {
 					delX[RHO][iElem] += alp[nn] * Z[nn][RHO][iElem];
 					delX[MX][iElem]  += alp[nn] * Z[nn][MX][iElem];
 					delX[MY][iElem]  += alp[nn] * Z[nn][MY][iElem];
 					delX[E][iElem]   += alp[nn] * Z[nn][E][iElem];
+                    }*/
+                #pragma acc parallel loop
+				for (long iElem = 0; iElem < nElems; ++iElem) {
+					delX[RHO][iElem] += alp[nn] * Z[nn][RHO][iElem];
 				}
+                 #pragma acc parallel loop
+				for (long iElem = 0; iElem < nElems; ++iElem) {
+					delX[MX][iElem]  += alp[nn] * Z[nn][MX][iElem];
+				}
+                #pragma acc parallel loop
+				for (long iElem = 0; iElem < nElems; ++iElem) {
+					delX[MY][iElem]  += alp[nn] * Z[nn][MY][iElem];
+				}
+               #pragma acc parallel loop
+				for (long iElem = 0; iElem < nElems; ++iElem) {
+					delX[E][iElem]   += alp[nn] * Z[nn][E][iElem];
+				}
+
+                
 			}
 			nGMRESiterGlobal += nInnerGMRES;
 
 			return;
 		} else {
 			/* no convergence, next iteration */
-			#pragma omp parallel for
+            /*			#pragma omp parallel for
+            #pragma acc parallel loop
 			for (long iElem = 0; iElem < nElems; ++iElem) {
 				V[m + 1][RHO][iElem] = W[RHO][iElem] / H[m + 1][m];
 				V[m + 1][MX][iElem]  = W[MX][iElem]  / H[m + 1][m];
 				V[m + 1][MY][iElem]  = W[MY][iElem]  / H[m + 1][m];
 				V[m + 1][E][iElem]   = W[E][iElem]   / H[m + 1][m];
+                }*/
+            #pragma acc parallel loop
+			for (long iElem = 0; iElem < nElems; ++iElem) {
+				V[m + 1][RHO][iElem] = W[RHO][iElem] / H[m + 1][m];
 			}
+            #pragma acc parallel loop
+			for (long iElem = 0; iElem < nElems; ++iElem) {
+				V[m + 1][MX][iElem]  = W[MX][iElem]  / H[m + 1][m];
+			}
+            #pragma acc parallel loop
+			for (long iElem = 0; iElem < nElems; ++iElem) {
+				V[m + 1][MY][iElem]  = W[MY][iElem]  / H[m + 1][m];
+			}
+            #pragma acc parallel loop
+			for (long iElem = 0; iElem < nElems; ++iElem) {
+				V[m + 1][E][iElem]   = W[E][iElem]   / H[m + 1][m];
+			}
+
+            
 		}
 	}
 

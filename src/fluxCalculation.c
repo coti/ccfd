@@ -882,6 +882,7 @@ void diffusionFlux(double state[NVAR], double gradX[NVAR], double gradY[NVAR],
 void fluxCalculation(void)
 {
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iSide = 0; iSide < nSides; ++iSide) {
 		side_t *aSide = side[iSide];
 

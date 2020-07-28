@@ -6,10 +6,16 @@
  * \date Sat 21 Mar 2020 07:52:42 PM CET
  */
 
+#ifdef __POWERPC__
+#define __NO_LONG_DOUBLE_MATH
+#endif // __POWERPC__
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef ACC_GPU
 #include <math.h>
+#endif // ACC_GPU
 #include <omp.h>
 #include <float.h>
 
@@ -253,6 +259,7 @@ void calcTimeStep(double pTime, double *dt, bool *viscousTimeStepDominates)
 	if (isTimeStep1D) {
 		double dtMax = 1e150;
 		#pragma omp parallel for reduction(min:dtMax)
+ 	    #pragma acc parallel loop reduction(min:dtMax)
 		for (long iElem = 0; iElem < nElems; ++iElem) {
 			elem_t *aElem = elem[iElem];
 			double a = sqrt(gam * aElem->pVar[P] / aElem->pVar[RHO]);
@@ -272,8 +279,11 @@ void calcTimeStep(double pTime, double *dt, bool *viscousTimeStepDominates)
 	} else {
 		double gamPrMax = fmax(4.0 / 3.0, gam / Pr);
 		double dtConvMax = 1e150;
+    printf( "toto" );
 		#pragma omp parallel for reduction(min:dtConvMax)
+ 	    #pragma acc parallel loop gang reduction(min:dtConvMax)
 		for (long iElem = 0; iElem < nElems; ++iElem) {
+    printf( "toto" );
 			elem_t *aElem = elem[iElem];
 			/* convective time step */
 			double a = sqrt(gam * aElem->pVar[P] / aElem->pVar[RHO]);
@@ -291,6 +301,7 @@ void calcTimeStep(double pTime, double *dt, bool *viscousTimeStepDominates)
 		double dtViscMax = 1e150;
 		if (mu > 1e-10) {
 			#pragma omp parallel for reduction(min:dtViscMax)
+            #pragma acc parallel loop reduction(min:dtViscMax)
 			for (long iElem = 0; iElem < nElems; ++iElem) {
 				elem_t *aElem = elem[iElem];
 				double sumSpectralRadii
@@ -322,6 +333,7 @@ void calcTimeStep(double pTime, double *dt, bool *viscousTimeStepDominates)
 
 	/* set local time step for each cell to the global time step */
 	#pragma omp parallel for
+    #pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 		aElem->dt = *dt;
@@ -339,6 +351,7 @@ void explicitTimeStepEuler(double time, double dt, double resIter[NVAR + 2])
 	fvTimeDerivative(time);
 
 	#pragma omp parallel for
+    #pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 
@@ -363,6 +376,7 @@ void explicitTimeStepRK(double time, double dt, double resIter[NVAR + 2])
 {
 	/* save the initial solution as needed for the RK scheme */
 	#pragma omp parallel for
+    #pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 		aElem->cVarStage[RHO] = aElem->cVar[RHO];
@@ -378,6 +392,7 @@ void explicitTimeStepRK(double time, double dt, double resIter[NVAR + 2])
 
 		/* time update of conservative variables */
 		#pragma omp parallel for
+        #pragma acc parallel loop
 		for (long iElem = 0; iElem < nElems; ++iElem) {
 			elem_t *aElem = elem[iElem];
 
@@ -416,6 +431,7 @@ void implicitTimeStep(double time, double dt, double resIter[NVAR + 2])
 	double beta = 1.0;
 
 	#pragma omp parallel for
+    #pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 
@@ -433,6 +449,7 @@ void implicitTimeStep(double time, double dt, double resIter[NVAR + 2])
 	fvTimeDerivative(time);
 
 	#pragma omp parallel for
+    #pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 
@@ -503,6 +520,7 @@ void implicitTimeStep(double time, double dt, double resIter[NVAR + 2])
 				&abortCritGMRES, deltaX);
 
 		#pragma omp parallel for
+        #pragma acc parallel loop
 		for (long iElem = 0; iElem < nElems; ++iElem) {
 			elem_t *aElem = elem[iElem];
 
@@ -522,6 +540,7 @@ void implicitTimeStep(double time, double dt, double resIter[NVAR + 2])
 		fvTimeDerivative(time);
 
 		#pragma omp parallel for
+        #pragma acc parallel loop
 		for (long iElem = 0; iElem < nElems; ++iElem) {
 			elem_t *aElem = elem[iElem];
 

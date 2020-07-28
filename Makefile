@@ -15,20 +15,35 @@ LIBDIR = lib
 LIBS	 = -lm
 CGNS_DIR = $(LIBDIR)/CGNS-$(CGNS_VERSION)
 CGNS_LIB = $(CGNS_DIR)/BUILD/src/libcgns.a
-INCDIR   = -I $(CGNS_DIR)/BUILD/include
-LIBS    += -L $(CGNS_DIR)/BUILD/lib -lcgns
+INCDIR   = -I$(CGNS_DIR)/BUILD/include
+LIBS    += -L$(CGNS_DIR)/BUILD/lib -lcgns
 
 ### Compile- and linkflags:
 ifeq ($(COMPILER), gnu)
   CC    = $(GCC)
-  FLAGS = -std=c99 -Wall -Wextra -pedantic -Wno-unknown-pragmas
+  FLAGS = -std=gnu99 -Wall -Wextra -pedantic -Wno-unknown-pragmas
   ifeq ($(DEBUG), on)
     FLAGS += -ggdb3 -Og
   else
-    FLAGS += -O3 -flto -march=native
+#    FLAGS += -O3 -flto -march=native
+    FLAGS += -O3 -mcpu=powerpc64le
   endif
-  ifeq ($(PARALLEL), on)
+  ifeq ($(PARALLEL), openmp)
     FLAGS += -fopenmp
+    ifeq ($(GPU), on)
+      FLAGS += -fopenmp-targets=nvptx64-nvidia-cuda
+    else
+      FLAGS += -fopenmp-targets=powerpc64le-unknown-linux-gnu
+    endif
+  else
+    ifeq ($(PARALLEL), openacc)
+      FLAGS += -fopenacc -DOPENACC
+      ifeq ($(GPU), on)
+	FLAGS += -fopenmp-targets=nvptx64-nvidia-cuda -DACC_GPU
+      else
+	FLAGS += -fopenmp-targets=powerpc64le-unknown-linux-gnu
+      endif
+    endif
   endif
   ifeq ($(PROF), on)
     FLAGS += -pg

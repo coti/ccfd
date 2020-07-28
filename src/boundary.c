@@ -300,6 +300,7 @@ void boundary(side_t *aSide, double time, double int_pVar[NVAR],
 void setBCatSides(double time)
 {
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iSide = 0; iSide < nBCsides; ++iSide) {
 		side_t *gSide = BCside[iSide];
 		side_t *aSide = gSide->connection;
@@ -320,6 +321,7 @@ void setBCatSides(double time)
 void setBCatBarys(double time)
 {
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iSide = 0; iSide < nBCsides; ++iSide) {
 		side_t *gSide = BCside[iSide];
 		elem_t *gElem = gSide->elem;

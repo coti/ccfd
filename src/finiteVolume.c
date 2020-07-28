@@ -79,6 +79,7 @@ void fvTimeDerivative(double time)
 {
 	/* set dt for boundary condition calculation */
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 		aElem->dtLoc = 0.5 * aElem->dt * (timeOrder - 1);
@@ -94,6 +95,7 @@ void fvTimeDerivative(double time)
 
 	/* time update of the conservative variables */
 	#pragma omp parallel for
+	#pragma acc parallel loop
 	for (long iElem = 0; iElem < nElems; ++iElem) {
 		elem_t *aElem = elem[iElem];
 		side_t *aSide = aElem->firstSide;
